@@ -1,3 +1,3 @@
-# jobtrack-hub
+# Job tracking app with chrome extensio
 The project includes an extension for chrome as well as applications for tracking the progress of recruitment processes.
 
