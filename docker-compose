@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  mongo-keys:
+    image: depop/openssl-bats
+    container_name: mongo-keys
+    volumes:
+      - mongo-keys:/mongo-conf
+    command: 'bash -c "openssl rand -base64 741 > /mongo-conf/mongodb-keyfile; chmod 600 /mongo-conf/mongodb-keyfile; chown 999 /mongo-conf/mongodb-keyfile"'
+
+  mongodb1:
+    image: mongo:latest
+    container_name: mongodb1
+    volumes:
+      - mongodb1_data:/data/db
+      - mongo-keys:/opt/keyfile
+    env_file:
+      - .env
+    command: 'mongod --auth --keyFile /opt/keyfile/mongodb-keyfile --replSet cluster'
+    depends_on:
+      - mongo-keys
+    networks:
+      - app-network
+    
+  mongodb2:
+    image: mongo:latest
+    container_name: mongodb2
+    volumes:
+      - mongodb2_data:/data/db
+      - mongo-keys:/opt/keyfile
+    env_file:
+      - .env
+    command: 'mongod --auth --keyFile /opt/keyfile/mongodb-keyfile --replSet cluster'
+    depends_on:
+      - mongo-keys
+    networks:
+      - app-network
+
+  mongodb3:
+    image: mongo:latest
+    container_name: mongodb3
+    volumes:
+      - mongodb3_data:/data/db
+      - mongo-keys:/opt/keyfile
+    env_file:
+      - .env
+    command: 'mongod --auth --keyFile /opt/keyfile/mongodb-keyfile --replSet cluster'
+    depends_on:
+      - mongo-keys
+    networks:
+      - app-network
+
+  cluster:
+    image: mongo:latest
+    container_name: cluster
+    env_file:
+      - .env
+    command: ["bash", "/init-cluster.sh"]
+    volumes:
+      - ./init-cluster.sh:/init-cluster.sh
+    depends_on:
+      - mongodb1
+      - mongodb2
+      - mongodb3
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    image: backend:latest
+    container_name: backend
+    depends_on:
+      - cluster
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./app:/app
+      - /app/node_modules
+    restart: always
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend-vite-react
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "5173:80"  # 5173 is Vite's default, but Nginx serves on 80 inside the container
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongodb1_data:
+  mongodb2_data:
+  mongodb3_data:
+  mongo-keys:
